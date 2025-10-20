@@ -1,34 +1,42 @@
-name: Generate Unique UUID Files in Folder
+name: Auto UUID Generator
 
 on:
-  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"   # Runs every 5 minutes
+  workflow_dispatch:         # Manual trigger
+
+permissions:
+  contents: write            # Required for committing changes
 
 jobs:
-  generate-uuid-files:
+  generate:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Create folder if not exists
         run: mkdir -p gen
 
-      - name: Generate UUID in a unique file inside folder
+      - name: Generate new UUID JSON in unique file
         run: |
-          # Find the next available file number
+          # Find next available file number
           n=1
-          while [ -f "gen/uuid$n.txt" ]; do
+          while [ -f "gen/uuid$n.json" ]; do
             n=$((n + 1))
           done
 
-          # Generate UUID and save to the new file
-          UUID=$(uuidgen)
-          echo $UUID > "gen/uuid$n.txt"
-          echo "UUID saved to gen/uuid$n.txt"
+          # Generate UUID and save
+          uuid=$(uuidgen)
+          echo "{\"uuid\": \"$uuid\"}" > "gen/uuid$n.json"
+          echo "Generated gen/uuid$n.json:"
+          cat "gen/uuid$n.json"
 
-      - name: Show all UUID files
-        run: ls -l gen
-
-      - name: Upload all UUID files
-        uses: actions/upload-artifact@v3
-        with:
-          name: uuid-files
-          path: gen/*.txt
+      - name: Commit and push new file
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add gen/uuid*.json
+          git commit -m "Add UUID $(date -u +'%Y-%m-%d %H:%M:%S')" || exit 0
+          git push
